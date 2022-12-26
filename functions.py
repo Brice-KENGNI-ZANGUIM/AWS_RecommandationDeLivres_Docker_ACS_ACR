@@ -8,7 +8,7 @@ from sklearn import preprocessing
 ########################################################################################
 ##########    Recommandation d'articles selon le modèle content-based      #############
 ########################################################################################
-def content_base_recommandation_par_utilisateur( user_id, rating_list, articles_list, n= 6 ) :
+def content_base_recommandation_par_utilisateur( user_id, rating_list, articles_list, n , anciens_articles   ) :
     """
     Description :
     -------------
@@ -33,6 +33,11 @@ def content_base_recommandation_par_utilisateur( user_id, rating_list, articles_
         - n : int
         ----
             Nombre de livres à recommander
+            
+       - anciens_articles : array
+        -------------------
+            liste des anciens articles déjà consultés par l'uitlisateur
+            
             
     Output :  DataFrame 
     ---------
@@ -61,6 +66,11 @@ def content_base_recommandation_par_utilisateur( user_id, rating_list, articles_
     
     # Tris dans l'ordre décroissant des notes de chaque livre
     _articles_list = _articles_list.sort_values(by= ["Rating"], ascending = False)
+
+    # Suppression des articles déjà consultés par l'uilisateur dans la liste des articles à recommander
+    _articles_list = _articles_list.loc[ _articles_list.article_id.apply( lambda x : x not in anciens_articles ).values ,:]
+
+    # limitation du nombre de recommandation
     _articles_list = _articles_list.iloc[:n, : ]
     
     # duplicatats
@@ -279,7 +289,7 @@ class SVD:
         return r_hat
         
     
-    def recommend(self, user_id, n = 10):
+    def recommend(self, user_id, n, anciens_articles ):
         """
         
         Description :
@@ -305,19 +315,23 @@ class SVD:
         predictions = np.dot(self.u_factors[u,:], self.i_factors) + self.umean[u]
         
         # sort item ids in decreasing order of predictions
-        top_idx = np.flip(np.argsort(predictions))[:n]
+        top_idx = np.flip(np.argsort(predictions))
 
         # decode indices to get their corresponding itemids
         top_items = self.items_encodeur.inverse_transform(top_idx)
         
+        # Suppression des articles déjà consultés par l'utilisateur
+        filtre = np.vectorize( lambda x : x not in anciens_articles )
+        top_items = top_items[ filtre( top_items ) ]
+        
         # recherche les catégories correspondantes aux articles
-        top_categs = [ self.metadata[self.metadata.article_id == art].category_id.values[0] for art in top_items ]
+        #top_categs = [ self.metadata[self.metadata.article_id == art].category_id.values[0] for art in top_items ]
         
         # Ratings rangés par ordre décroissant
-        preds = np.round( predictions[top_idx] , 4)
+        #preds = np.round( predictions[top_idx] , 4)
         
         #return pd.DataFrame({"article_id":top_items, "category_id": top_categs, "Rating":preds })
-        return pd.DataFrame({"article_id":top_items, "category_id": top_categs, "Rating":preds })
+        return pd.DataFrame({"article_id":top_items})[:n] #pd.DataFrame({"article_id":top_items, "category_id": top_categs, "Rating":preds })[:n]
 
 
 ##########################################################################################
